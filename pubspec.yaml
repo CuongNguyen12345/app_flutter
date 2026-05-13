@@ -1,0 +1,58 @@
+name: iot_controller
+description: IoT Device Controller App - Control lights and fans via MQTT
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ✅ HTTP client for REST API calls (Flutter Web compatible)
+  http: ^1.2.2
+
+  # ✅ MQTT client (for TCP or WebSocket)
+  mqtt_client: ^10.2.0
+
+  # ✅ State management
+  provider: ^6.1.1
+  
+  # ✅ UI components
+  cupertino_icons: ^1.0.6
+
+  # ✅ SQLite database (for Android/iOS only)
+  sqflite: ^2.2.8+3
+  path: ^1.8.3
+
+  # ✅ Chart visualization
+  fl_chart: ^1.1.1
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+dependency_overrides:
+  characters: ^1.4.1
+  material_color_utilities: ^0.13.0
+  meta: ^1.17.0
+  lints: ^6.0.0
+  test_api: ^0.7.7
+
+flutter:
+  uses-material-design: true
+
+  # Assets (optional)
+  # assets:
+  #   - images/
+  
+  # Fonts (optional)
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
