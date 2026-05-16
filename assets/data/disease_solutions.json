@@ -1,0 +1,134 @@
+{
+  "Grape___Black_rot": {
+    "plant": "grape",
+    "name_vi": "Nho - thối đen",
+    "status": "disease",
+    "solution": "Cắt bỏ và tiêu hủy lá, quả hoặc cành có triệu chứng; dọn sạch tàn dư bệnh quanh gốc; tỉa tán để tăng thông thoáng; tránh làm ướt lá khi tưới và theo dõi lây lan sau các đợt mưa ẩm."
+  },
+  "Grape___Esca_(Black_Measles)": {
+    "plant": "grape",
+    "name_vi": "Nho - bệnh Esca/đốm đen",
+    "status": "disease",
+    "solution": "Đánh dấu cây nghi bệnh để theo dõi; cắt bỏ phần thân/cành suy yếu bằng dụng cụ đã khử trùng; tránh gây vết thương lớn khi tỉa; cải thiện thoát nước và loại bỏ cây suy kiệt nặng nếu bệnh tái phát."
+  },
+  "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": {
+    "plant": "grape",
+    "name_vi": "Nho - cháy lá/đốm lá",
+    "status": "disease",
+    "solution": "Loại bỏ lá bệnh nặng; thu gom lá rụng; giữ giàn nho thông thoáng; tưới vào gốc thay vì phun lên lá; theo dõi thêm trong thời tiết ẩm vì đốm lá dễ lan bằng nước bắn."
+  },
+  "Grape___healthy": {
+    "plant": "grape",
+    "name_vi": "Nho - khỏe mạnh",
+    "status": "healthy",
+    "solution": "Cây đang không có dấu hiệu bệnh rõ ràng. Tiếp tục duy trì ánh sáng, thoát nước, dinh dưỡng cân đối và kiểm tra định kỳ mặt dưới lá sau mưa hoặc khi độ ẩm cao."
+  },
+  "Lemon___Anthracnose": {
+    "plant": "lemon",
+    "name_vi": "Chanh - thán thư",
+    "status": "disease",
+    "solution": "Cắt bỏ lá/cành khô bệnh; giảm stress cho cây bằng tưới và dinh dưỡng hợp lý; tỉa cành cho thoáng; tránh tưới phun lên tán; thu gom tàn dư bệnh để giảm nguồn lây."
+  },
+  "Lemon___Bacterial_blight": {
+    "plant": "lemon",
+    "name_vi": "Chanh - cháy lá vi khuẩn",
+    "status": "disease",
+    "solution": "Cách ly cây nghi bệnh nếu trồng chậu; cắt bỏ lá/cành bệnh bằng kéo sạch; tránh chạm hoặc tỉa cây khi lá còn ướt; giảm tưới phun lên lá và vệ sinh dụng cụ sau khi xử lý."
+  },
+  "Lemon___Citrus_canker": {
+    "plant": "lemon",
+    "name_vi": "Chanh - loét vi khuẩn/canker",
+    "status": "disease",
+    "solution": "Cắt bỏ bộ phận bệnh nhẹ nếu phù hợp; tránh làm nước bắn từ cây bệnh sang cây khỏe; vệ sinh kéo và tay sau khi thao tác; theo dõi chặt vì bệnh vi khuẩn dễ lan qua mưa, gió và dụng cụ."
+  },
+  "Lemon___Curl_virus": {
+    "plant": "lemon",
+    "name_vi": "Chanh - xoăn lá nghi virus",
+    "status": "disease",
+    "solution": "Kiểm tra rệp, bọ phấn hoặc côn trùng chích hút ở mặt dưới lá; loại bỏ lá/cành biến dạng nặng; hạn chế nhân giống từ cây nghi bệnh; quản lý côn trùng môi giới và cách ly cây bệnh nếu có thể."
+  },
+  "Lemon___Deficiency_leaf": {
+    "plant": "lemon",
+    "name_vi": "Chanh - lá thiếu dinh dưỡng",
+    "status": "deficiency",
+    "solution": "Kiểm tra độ ẩm đất, pH và lịch bón phân; bổ sung dinh dưỡng cân đối cho cây có múi theo khuyến cáo địa phương; tránh bón quá liều; theo dõi lá non và lá già để xác định thiếu chất cụ thể."
+  },
+  "Lemon___Dry_leaf": {
+    "plant": "lemon",
+    "name_vi": "Chanh - khô lá",
+    "status": "stress",
+    "solution": "Kiểm tra thiếu nước, úng rễ, nắng gắt hoặc gió nóng; cắt bỏ lá khô nặng; điều chỉnh tưới để đất ẩm nhưng không đọng nước; che giảm nắng tạm thời nếu cây mới trồng hoặc đang suy."
+  },
+  "Lemon___Sooty_mould": {
+    "plant": "lemon",
+    "name_vi": "Chanh - nấm bồ hóng",
+    "status": "disease",
+    "solution": "Kiểm tra và quản lý rệp, bọ phấn, rệp sáp hoặc côn trùng tiết mật ngọt; lau/rửa nhẹ lớp bồ hóng khi có thể; tỉa tán thoáng và xử lý nguồn côn trùng để hạn chế tái phát."
+  },
+  "Lemon___Spider_mites": {
+    "plant": "lemon",
+    "name_vi": "Chanh - nhện đỏ/nhện hại",
+    "status": "pest",
+    "solution": "Kiểm tra mặt dưới lá bằng kính lúp nếu có; tăng ẩm hợp lý và tránh để cây thiếu nước; rửa lá bằng tia nước nhẹ; ưu tiên biện pháp ít ảnh hưởng thiên địch và theo dõi mật số trước khi xử lý mạnh hơn."
+  },
+  "Lemon___healthy": {
+    "plant": "lemon",
+    "name_vi": "Chanh - khỏe mạnh",
+    "status": "healthy",
+    "solution": "Cây đang không có dấu hiệu bệnh rõ ràng. Tiếp tục tưới đều, giữ đất thoát nước, bón phân cân đối và kiểm tra định kỳ sâu chích hút ở mặt dưới lá."
+  },
+  "Peach___Bacterial_spot": {
+    "plant": "peach",
+    "name_vi": "Đào - đốm vi khuẩn",
+    "status": "disease",
+    "solution": "Loại bỏ lá/cành bệnh nặng; tránh tưới phun lên tán; tỉa cây thông thoáng; vệ sinh dụng cụ cắt tỉa; thu gom lá rụng và theo dõi bệnh trong thời tiết ấm ẩm."
+  },
+  "Peach___healthy": {
+    "plant": "peach",
+    "name_vi": "Đào - khỏe mạnh",
+    "status": "healthy",
+    "solution": "Cây đang không có dấu hiệu bệnh rõ ràng. Duy trì tán thông thoáng, tưới vào gốc, thu gom lá rụng và kiểm tra đốm lá sau các đợt mưa."
+  },
+  "Pepper,_bell___Bacterial_spot": {
+    "plant": "bell_pepper",
+    "name_vi": "Ớt chuông - đốm vi khuẩn",
+    "status": "disease",
+    "solution": "Ngắt bỏ lá bệnh sớm; tránh làm việc với cây khi lá ướt; tưới ở gốc, không tưới phun lên lá; giữ khoảng cách cây thông thoáng; dọn tàn dư cuối vụ và luân canh với cây không cùng họ cà."
+  },
+  "Pepper,_bell___healthy": {
+    "plant": "bell_pepper",
+    "name_vi": "Ớt chuông - khỏe mạnh",
+    "status": "healthy",
+    "solution": "Cây đang không có dấu hiệu bệnh rõ ràng. Tiếp tục giữ lá khô, tưới gốc, tạo thông thoáng và quan sát đốm nhỏ trên lá/quả trong giai đoạn nóng ẩm."
+  },
+  "Potato___Early_blight": {
+    "plant": "potato",
+    "name_vi": "Khoai tây - cháy lá sớm",
+    "status": "disease",
+    "solution": "Loại bỏ lá bệnh nặng; tránh tưới lên lá; phủ gốc hoặc giữ đất không bắn lên lá; bón dinh dưỡng cân đối để cây không suy; dọn tàn dư và luân canh cây trồng sau vụ."
+  },
+  "Potato___Late_blight": {
+    "plant": "potato",
+    "name_vi": "Khoai tây - cháy lá muộn",
+    "status": "disease",
+    "solution": "Cách ly hoặc loại bỏ sớm cây bệnh nếu phát hiện ít cây; giữ lá khô và tăng thông thoáng; không để củ/thân bệnh sót lại; theo dõi sát trong thời tiết mát ẩm vì bệnh có thể lan rất nhanh."
+  },
+  "Potato___healthy": {
+    "plant": "potato",
+    "name_vi": "Khoai tây - khỏe mạnh",
+    "status": "healthy",
+    "solution": "Cây đang không có dấu hiệu bệnh rõ ràng. Duy trì tưới gốc, thông thoáng luống, tránh để lá ẩm lâu và kiểm tra thường xuyên khi thời tiết mát ẩm."
+  },
+  "Strawberry___Leaf_scorch": {
+    "plant": "strawberry",
+    "name_vi": "Dâu tây - cháy lá",
+    "status": "disease",
+    "solution": "Cắt bỏ lá bệnh nặng; thu gom lá già và tàn dư quanh gốc; tưới vào gốc để hạn chế lá ướt kéo dài; giữ luống thông thoáng và thay thế cây quá suy sau khi bệnh tái phát nhiều."
+  },
+  "Strawberry___healthy": {
+    "plant": "strawberry",
+    "name_vi": "Dâu tây - khỏe mạnh",
+    "status": "healthy",
+    "solution": "Cây đang không có dấu hiệu bệnh rõ ràng. Giữ luống sạch, thông thoáng, tưới đều vào gốc và kiểm tra đốm tím/đốm cháy trên lá sau các đợt ẩm kéo dài."
+  }
+}

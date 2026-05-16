@@ -1,0 +1,8 @@
+fastapi==0.128.0
+numpy
+pillow
+python-multipart
+torch
+torchvision
+ultralytics
+uvicorn[standard]

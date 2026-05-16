@@ -5,6 +5,7 @@ import 'dart:js' as js;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:iot_controller/ai_backend_config.dart';
 
 void main() => runApp(const SmartFarmApp());
 
@@ -18,6 +19,11 @@ const kGlassBdr = Color(0x38FFFFFF);
 const kTextPrim = Color(0xFFE8F5E9);
 const kTextSec = Color(0xB3E8F5E9);
 const kTotalPlantPositions = 8;
+final kAiPredictUrl = resolveAiPredictUrl(
+  configuredUrl: const String.fromEnvironment('AI_PREDICT_URL'),
+  pageProtocol: html.window.location.protocol,
+  pageHostname: html.window.location.hostname ?? 'localhost',
+);
 const kDefaultPlantDisease =
     'có dấu hiệu bất thường, nghi ngờ nấm lá, sâu bệnh hoặc thiếu dinh dưỡng';
 const kDefaultPlantSolution =
@@ -856,9 +862,7 @@ class PlantAlertCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: kTextSec)),
               const SizedBox(height: 4),
               Text(
-                hasAlert
-                    ? 'Vườn cây đang không tốt'
-                    : 'Vườn cây hiện đang tốt',
+                hasAlert ? 'Vườn cây đang không tốt' : 'Vườn cây hiện đang tốt',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -1160,6 +1164,9 @@ class _CameraPageState extends State<CameraPage> {
   List<html.MediaDeviceInfo> _cameraDevices = [];
   String? _selectedCameraDeviceId;
   String? _cameraError;
+  bool _isAnalyzing = false;
+  Map<String, dynamic>? _aiResult;
+  String? _aiError;
 
   Future<void> _loadCameraDevices() async {
     try {
@@ -1197,11 +1204,13 @@ class _CameraPageState extends State<CameraPage> {
     setState(() {
       _isLoadingWebcam = true;
       _cameraError = null;
+      _aiError = null;
+      _aiResult = null;
     });
 
     try {
-      final mediaStream = await html.window.navigator.mediaDevices
-          ?.getUserMedia({
+      final mediaStream =
+          await html.window.navigator.mediaDevices?.getUserMedia({
         'video': deviceId != null && deviceId.isNotEmpty
             ? {
                 'deviceId': {'exact': deviceId}
@@ -1210,7 +1219,8 @@ class _CameraPageState extends State<CameraPage> {
         'audio': false,
       });
       if (mediaStream != null) {
-        _webcamViewId = 'webcam-view-id-${DateTime.now().millisecondsSinceEpoch}';
+        _webcamViewId =
+            'webcam-view-id-${DateTime.now().millisecondsSinceEpoch}';
 
         _webcamVideoElement = html.VideoElement()
           ..autoplay = true
@@ -1222,7 +1232,8 @@ class _CameraPageState extends State<CameraPage> {
           ..style.objectFit = 'cover'
           ..srcObject = mediaStream;
 
-        ui_web.platformViewRegistry.registerViewFactory(_webcamViewId, (int viewId) {
+        ui_web.platformViewRegistry.registerViewFactory(_webcamViewId,
+            (int viewId) {
           return _webcamVideoElement!;
         });
 
@@ -1292,7 +1303,59 @@ class _CameraPageState extends State<CameraPage> {
       _useWebcam = false;
       _activeUrl = nextUrl.isEmpty ? null : nextUrl;
       _cameraError = null;
+      _aiError = null;
+      _aiResult = null;
     });
+  }
+
+  Future<void> _analyzeCurrentFrame() async {
+    final video = _webcamVideoElement;
+    final width = video?.videoWidth ?? 0;
+    final height = video?.videoHeight ?? 0;
+    if (!_useWebcam || video == null || width <= 0 || height <= 0) {
+      setState(() {
+        _aiError = 'Hay chon camera laptop/webcam truoc khi phan tich AI.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isAnalyzing = true;
+      _aiError = null;
+    });
+
+    try {
+      final canvas = html.CanvasElement(width: width, height: height);
+      canvas.context2D.drawImageScaled(video, 0, 0, width, height);
+      final dataUrl = canvas.toDataUrl('image/jpeg', 0.9);
+      final bytes = base64Decode(dataUrl.split(',').last);
+      final request = http.MultipartRequest('POST', Uri.parse(kAiPredictUrl))
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: 'webcam-frame.jpg',
+        ));
+
+      final response =
+          await request.send().timeout(const Duration(seconds: 45));
+      final body = await response.stream.bytesToString();
+      if (response.statusCode != 200) {
+        throw Exception('AI backend ${response.statusCode}: $body');
+      }
+
+      final decoded = jsonDecode(body);
+      if (!mounted) return;
+      setState(() {
+        _aiResult = Map<String, dynamic>.from(decoded as Map);
+        _isAnalyzing = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isAnalyzing = false;
+        _aiError = formatAiBackendConnectionError(e, kAiPredictUrl);
+      });
+    }
   }
 
   String _cameraDeviceLabel(html.MediaDeviceInfo device, int index) {
@@ -1330,6 +1393,16 @@ class _CameraPageState extends State<CameraPage> {
       return 'MJPEG URL';
     }
     return 'Chua chon';
+  }
+
+  List<dynamic> get _aiDetections {
+    final raw = _aiResult?['detections'];
+    return raw is List ? raw : const [];
+  }
+
+  Map<String, dynamic>? get _aiSummary {
+    final raw = _aiResult?['summary'];
+    return raw is Map ? Map<String, dynamic>.from(raw) : null;
   }
 
   @override
@@ -1409,8 +1482,8 @@ class _CameraPageState extends State<CameraPage> {
                             : null,
                         color: _isDeviceSelected(_laptopCamera)
                             ? null
-                            : Colors.white.withOpacity(
-                                _laptopCamera == null ? .02 : .05),
+                            : Colors.white
+                                .withOpacity(_laptopCamera == null ? .02 : .05),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0x38FFFFFF)),
                       ),
@@ -1487,17 +1560,95 @@ class _CameraPageState extends State<CameraPage> {
               borderRadius: BorderRadius.circular(16),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: _isLoadingWebcam
-                    ? const Center(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (_isLoadingWebcam)
+                      const Center(
                         child: CircularProgressIndicator(color: kGreen2),
                       )
-                    : _useWebcam
-                    ? HtmlElementView(viewType: _webcamViewId)
-                    : (_activeUrl != null
-                        ? Image.network(_activeUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _NoCamera())
-                        : _NoCamera()),
+                    else if (_useWebcam)
+                      HtmlElementView(viewType: _webcamViewId)
+                    else if (_activeUrl != null)
+                      Image.network(_activeUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _NoCamera())
+                    else
+                      _NoCamera(),
+                    if (_aiResult != null)
+                      CustomPaint(
+                        painter: _AiDetectionPainter(
+                          detections: _aiDetections,
+                          image: Map<String, dynamic>.from(
+                              _aiResult?['image'] as Map? ?? const {}),
+                        ),
+                      ),
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: GestureDetector(
+                        onTap: _isAnalyzing ? null : _analyzeCurrentFrame,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            gradient: _isAnalyzing
+                                ? null
+                                : const LinearGradient(
+                                    colors: [kGreen1, kBgMid]),
+                            color: _isAnalyzing
+                                ? Colors.white.withOpacity(.08)
+                                : null,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0x66FFFFFF)),
+                          ),
+                          child: Text(
+                              _isAnalyzing ? 'Dang xu ly' : 'Phan tich AI',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12)),
+                        ),
+                      ),
+                    ),
+                    if (_aiSummary != null || _aiError != null)
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        top: 10,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xCC071A0D),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0x38FFFFFF)),
+                          ),
+                          child: Text(
+                            _aiError ??
+                                '${_aiSummary?['disease_name_vi'] ?? _aiSummary?['message'] ?? 'Chua co ket qua'}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _aiError != null
+                                  ? const Color(0xFFFCA5A5)
+                                  : (_aiSummary?['has_disease'] == true
+                                      ? Colors.orangeAccent
+                                      : kGreen2),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_isAnalyzing)
+                      Container(
+                        color: Colors.black45,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: kGreen2),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1543,8 +1694,8 @@ class _CameraPageState extends State<CameraPage> {
                 GestureDetector(
                   onTap: _useMjpegStream,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(colors: [kGreen1, kBgMid]),
                       borderRadius: BorderRadius.circular(10),
@@ -1657,5 +1808,75 @@ class _NoCamera extends StatelessWidget {
             style: TextStyle(color: kTextSec, fontSize: 12)),
       ]),
     );
+  }
+}
+
+class _AiDetectionPainter extends CustomPainter {
+  final List<dynamic> detections;
+  final Map<String, dynamic> image;
+
+  _AiDetectionPainter({required this.detections, required this.image});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final imageWidth = (image['width'] as num?)?.toDouble() ?? 0;
+    final imageHeight = (image['height'] as num?)?.toDouble() ?? 0;
+    if (imageWidth <= 0 || imageHeight <= 0) return;
+
+    final scaleX = size.width / imageWidth;
+    final scaleY = size.height / imageHeight;
+    final boxPaint = Paint()
+      ..color = Colors.orangeAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+    final fillPaint = Paint()
+      ..color = Colors.black.withOpacity(.58)
+      ..style = PaintingStyle.fill;
+
+    for (final item in detections) {
+      if (item is! Map) continue;
+      final box = item['box'];
+      if (box is! List || box.length < 4) continue;
+
+      final left = ((box[0] as num).toDouble() * scaleX).clamp(0.0, size.width);
+      final top = ((box[1] as num).toDouble() * scaleY).clamp(0.0, size.height);
+      final right =
+          ((box[2] as num).toDouble() * scaleX).clamp(0.0, size.width);
+      final bottom =
+          ((box[3] as num).toDouble() * scaleY).clamp(0.0, size.height);
+      final rect = Rect.fromLTRB(left, top, right, bottom);
+      canvas.drawRect(rect, boxPaint);
+
+      final label =
+          '${item['disease_name_vi'] ?? item['disease'] ?? 'leaf'} ${(100 * ((item['disease_confidence'] as num?)?.toDouble() ?? 0)).toStringAsFixed(0)}%';
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width - left - 8);
+      final labelRect = Rect.fromLTWH(
+        left,
+        (top - textPainter.height - 7).clamp(0.0, size.height),
+        textPainter.width + 8,
+        textPainter.height + 5,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(labelRect, const Radius.circular(5)),
+        fillPaint,
+      );
+      textPainter.paint(canvas, Offset(labelRect.left + 4, labelRect.top + 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AiDetectionPainter oldDelegate) {
+    return oldDelegate.detections != detections || oldDelegate.image != image;
   }
 }
