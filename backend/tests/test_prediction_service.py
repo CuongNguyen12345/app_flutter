@@ -74,6 +74,79 @@ class PredictionServiceTest(unittest.TestCase):
         self.assertEqual(result["summary"]["leaf_count"], 0)
         self.assertEqual(result["summary"]["message"], "Khong phat hien la cay trong anh.")
 
+    def test_predict_ignores_tiny_leaf_boxes_from_screen_feedback(self):
+        class MixedSizeLeafDetector:
+            def detect(self, image):
+                return [
+                    Detection(box=[10, 10, 25, 25], confidence=0.99),
+                    Detection(box=[40, 20, 140, 100], confidence=0.80),
+                ]
+
+        image = Image.new("RGB", (160, 120), color=(20, 90, 30))
+        service = PredictionService(
+            detector=MixedSizeLeafDetector(),
+            classifier=FakeDiseaseClassifier(),
+            solutions={
+                "Lemon___Citrus_canker": {
+                    "name_vi": "Chanh - loet vi khuan/canker",
+                    "status": "disease",
+                    "solution": "Cat bo la benh va tranh tuoi phun len la.",
+                }
+            },
+            min_leaf_area_ratio=0.08,
+        )
+
+        result = service.predict(image)
+
+        self.assertEqual(len(result["detections"]), 1)
+        self.assertEqual(result["detections"][0]["box"], [40, 20, 140, 100])
+        self.assertEqual(result["summary"]["leaf_count"], 1)
+
+    def test_predict_uses_largest_leaf_for_summary(self):
+        class MixedSizeLeafDetector:
+            def detect(self, image):
+                return [
+                    Detection(box=[0, 0, 40, 40], confidence=0.99),
+                    Detection(box=[40, 10, 150, 110], confidence=0.80),
+                ]
+
+        class SizeAwareClassifier:
+            def classify(self, image):
+                if image.width < 60:
+                    return {
+                        "class_name": "Strawberry___Leaf_scorch",
+                        "confidence": 0.99,
+                    }
+                return {
+                    "class_name": "Lemon___Citrus_canker",
+                    "confidence": 0.70,
+                }
+
+        image = Image.new("RGB", (160, 120), color=(20, 90, 30))
+        service = PredictionService(
+            detector=MixedSizeLeafDetector(),
+            classifier=SizeAwareClassifier(),
+            solutions={
+                "Strawberry___Leaf_scorch": {
+                    "name_vi": "Dau tay - chay la",
+                    "status": "disease",
+                    "solution": "Kiem tra dau tay.",
+                },
+                "Lemon___Citrus_canker": {
+                    "name_vi": "Chanh - loet vi khuan/canker",
+                    "status": "disease",
+                    "solution": "Kiem tra chanh.",
+                },
+            },
+            min_leaf_area_ratio=0.01,
+        )
+
+        result = service.predict(image)
+
+        self.assertEqual(len(result["detections"]), 2)
+        self.assertEqual(result["summary"]["disease"], "Lemon___Citrus_canker")
+        self.assertEqual(result["summary"]["disease_name_vi"], "Chanh - loet vi khuan/canker")
+
 
 if __name__ == "__main__":
     unittest.main()

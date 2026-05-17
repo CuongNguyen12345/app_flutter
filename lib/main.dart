@@ -24,6 +24,7 @@ final kAiPredictUrl = resolveAiPredictUrl(
   pageProtocol: html.window.location.protocol,
   pageHostname: html.window.location.hostname ?? 'localhost',
 );
+final kAiBackendBaseUrl = resolveAiBackendBaseUrl(kAiPredictUrl);
 const kDefaultPlantDisease =
     'có dấu hiệu bất thường, nghi ngờ nấm lá, sâu bệnh hoặc thiếu dinh dưỡng';
 const kDefaultPlantSolution =
@@ -1164,9 +1165,14 @@ class _CameraPageState extends State<CameraPage> {
   List<html.MediaDeviceInfo> _cameraDevices = [];
   String? _selectedCameraDeviceId;
   String? _cameraError;
-  bool _isAnalyzing = false;
   Map<String, dynamic>? _aiResult;
   String? _aiError;
+  Timer? _monitorPollTimer;
+  Timer? _browserAnalyzeTimer;
+  bool _isMonitorBusy = false;
+  bool _useBrowserAutoScan = false;
+  bool _isBrowserAnalyzing = false;
+  Map<String, dynamic>? _monitorStatus;
 
   Future<void> _loadCameraDevices() async {
     try {
@@ -1277,11 +1283,18 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void initState() {
     super.initState();
-    _startWebcam();
+    _loadCameraDevices();
+    _refreshMonitor(silent: true);
+    _monitorPollTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _refreshMonitor(silent: true),
+    );
   }
 
   @override
   void dispose() {
+    _monitorPollTimer?.cancel();
+    _browserAnalyzeTimer?.cancel();
     _stopWebcam();
     _urlCtrl.dispose();
     super.dispose();
@@ -1293,10 +1306,14 @@ class _CameraPageState extends State<CameraPage> {
       _selectedCameraDeviceId = deviceId;
     });
     await _startWebcam(deviceId: deviceId);
+    if (_useBrowserAutoScan) {
+      _scheduleBrowserAutoScan();
+    }
   }
 
   void _useMjpegStream() {
     final nextUrl = _urlCtrl.text.trim();
+    _stopBrowserAutoScan(stopCamera: false);
     _stopWebcam();
     if (!mounted) return;
     setState(() {
@@ -1308,32 +1325,166 @@ class _CameraPageState extends State<CameraPage> {
     });
   }
 
-  Future<void> _analyzeCurrentFrame() async {
+  Uri _monitorUri(String path) => Uri.parse('$kAiBackendBaseUrl$path');
+
+  Future<Map<String, dynamic>> _getMonitorJson(String path) async {
+    final response =
+        await http.get(_monitorUri(path)).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw Exception('AI backend ${response.statusCode}: ${response.body}');
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> _postMonitorJson(String path) async {
+    final response =
+        await http.post(_monitorUri(path)).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw Exception('AI backend ${response.statusCode}: ${response.body}');
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<void> _refreshMonitor({bool silent = false}) async {
+    try {
+      final status = await _getMonitorJson('/monitor/status');
+      final latest = await _getMonitorJson('/monitor/latest');
+      final result = latest['result'];
+      if (!mounted) return;
+      setState(() {
+        _monitorStatus = status;
+        if (!_useBrowserAutoScan) {
+          _aiError = null;
+        }
+        if (!_useBrowserAutoScan && result is Map) {
+          _aiResult = Map<String, dynamic>.from(result);
+        }
+      });
+    } catch (e) {
+      if (!mounted || silent) return;
+      setState(() {
+        _aiError = formatAiBackendConnectionError(e, kAiBackendBaseUrl);
+      });
+    }
+  }
+
+  Future<void> _startAutoMonitor() async {
+    setState(() {
+      _isMonitorBusy = true;
+      _aiError = null;
+    });
+    try {
+      _stopBrowserAutoScan(stopCamera: true);
+      final status = await _postMonitorJson('/monitor/start');
+      if (!mounted) return;
+      setState(() {
+        _monitorStatus = status;
+      });
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await _refreshMonitor(silent: false);
+      if (_backendWebcamUnavailable) {
+        await _startBrowserAutoScan();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiError = formatAiBackendConnectionError(e, kAiBackendBaseUrl);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMonitorBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _stopAutoMonitor() async {
+    setState(() {
+      _isMonitorBusy = true;
+      _aiError = null;
+    });
+    try {
+      _stopBrowserAutoScan(stopCamera: true);
+      final status = await _postMonitorJson('/monitor/stop');
+      if (!mounted) return;
+      setState(() {
+        _monitorStatus = status;
+      });
+      await _refreshMonitor(silent: false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiError = formatAiBackendConnectionError(e, kAiBackendBaseUrl);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMonitorBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _startBrowserAutoScan() async {
+    final deviceId = _selectedCameraDeviceId;
+    setState(() {
+      _useBrowserAutoScan = true;
+      _aiError = null;
+    });
+    await _startWebcam(deviceId: deviceId);
+    if (!mounted) return;
+    _scheduleBrowserAutoScan();
+    await _analyzeBrowserFrame();
+  }
+
+  void _scheduleBrowserAutoScan() {
+    _browserAnalyzeTimer?.cancel();
+    _browserAnalyzeTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _analyzeBrowserFrame(),
+    );
+  }
+
+  void _stopBrowserAutoScan({required bool stopCamera}) {
+    _browserAnalyzeTimer?.cancel();
+    _browserAnalyzeTimer = null;
+    _useBrowserAutoScan = false;
+    _isBrowserAnalyzing = false;
+    if (stopCamera) {
+      _stopWebcam();
+    }
+  }
+
+  Future<void> _analyzeBrowserFrame() async {
+    if (_isBrowserAnalyzing) return;
+
     final video = _webcamVideoElement;
     final width = video?.videoWidth ?? 0;
     final height = video?.videoHeight ?? 0;
     if (!_useWebcam || video == null || width <= 0 || height <= 0) {
+      if (!mounted) return;
       setState(() {
-        _aiError = 'Hay chon camera laptop/webcam truoc khi phan tich AI.';
+        _aiError = 'Khong mo duoc camera trinh duyet de quet tu dong.';
       });
       return;
     }
 
     setState(() {
-      _isAnalyzing = true;
+      _isBrowserAnalyzing = true;
       _aiError = null;
     });
 
     try {
       final canvas = html.CanvasElement(width: width, height: height);
       canvas.context2D.drawImageScaled(video, 0, 0, width, height);
-      final dataUrl = canvas.toDataUrl('image/jpeg', 0.9);
+      final dataUrl = canvas.toDataUrl('image/jpeg', 0.85);
       final bytes = base64Decode(dataUrl.split(',').last);
       final request = http.MultipartRequest('POST', Uri.parse(kAiPredictUrl))
         ..files.add(http.MultipartFile.fromBytes(
           'file',
           bytes,
-          filename: 'webcam-frame.jpg',
+          filename: 'browser-webcam-frame.jpg',
         ));
 
       final response =
@@ -1347,14 +1498,18 @@ class _CameraPageState extends State<CameraPage> {
       if (!mounted) return;
       setState(() {
         _aiResult = Map<String, dynamic>.from(decoded as Map);
-        _isAnalyzing = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isAnalyzing = false;
         _aiError = formatAiBackendConnectionError(e, kAiPredictUrl);
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBrowserAnalyzing = false;
+        });
+      }
     }
   }
 
@@ -1403,6 +1558,69 @@ class _CameraPageState extends State<CameraPage> {
   Map<String, dynamic>? get _aiSummary {
     final raw = _aiResult?['summary'];
     return raw is Map ? Map<String, dynamic>.from(raw) : null;
+  }
+
+  String? get _backendMonitorError {
+    final raw = _monitorStatus?['latest_error'];
+    return raw is String && raw.isNotEmpty ? raw : null;
+  }
+
+  bool get _backendWebcamUnavailable =>
+      isBackendWebcamUnavailableError(_backendMonitorError);
+
+  bool get _monitorRunning =>
+      _useBrowserAutoScan || _monitorStatus?['running'] == true;
+
+  bool get _monitorAnalyzing =>
+      _isBrowserAnalyzing || _monitorStatus?['analyzing'] == true;
+
+  bool get _hasMonitorError {
+    final backendError = _backendMonitorError;
+    return _aiError != null ||
+        (!_useBrowserAutoScan &&
+            backendError != null &&
+            !isBackendWebcamUnavailableError(backendError));
+  }
+
+  String get _monitorStatusLabel {
+    final backendError = _backendMonitorError;
+    if (_aiError != null) return 'Loi ket noi backend';
+    if (_useBrowserAutoScan) {
+      return _isBrowserAnalyzing
+          ? 'Dang phan tich bang camera trinh duyet'
+          : 'Dang quet bang camera trinh duyet';
+    }
+    if (backendError != null) {
+      return 'Loi webcam/backend';
+    }
+    if (_isMonitorBusy) return 'Dang gui lenh';
+    if (_monitorRunning) {
+      return _monitorAnalyzing
+          ? 'Dang phan tich tu dong'
+          : 'Dang quet tu dong';
+    }
+    return 'Quet tu dong dang tat';
+  }
+
+  String get _cameraOverlayText {
+    final backendError = _backendMonitorError;
+    if (_aiError != null) return _aiError!;
+    if (!_useBrowserAutoScan && backendError != null) return backendError;
+    if (_aiSummary != null) {
+      return '${_aiSummary?['disease_name_vi'] ?? _aiSummary?['message'] ?? 'Chua co ket qua'}';
+    }
+    return _monitorStatusLabel;
+  }
+
+  Color get _cameraOverlayColor {
+    if (_hasMonitorError) return const Color(0xFFFCA5A5);
+    if (_aiSummary?['has_disease'] == true) return Colors.orangeAccent;
+    return kGreen2;
+  }
+
+  String get _monitorButtonText {
+    if (_isMonitorBusy) return 'Dang gui lenh';
+    return _monitorRunning ? 'Tat quet tu dong' : 'Bat quet tu dong';
   }
 
   @override
@@ -1587,23 +1805,26 @@ class _CameraPageState extends State<CameraPage> {
                       right: 10,
                       bottom: 10,
                       child: GestureDetector(
-                        onTap: _isAnalyzing ? null : _analyzeCurrentFrame,
+                        onTap: _isMonitorBusy
+                            ? null
+                            : (_monitorRunning
+                                ? _stopAutoMonitor
+                                : _startAutoMonitor),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 9),
                           decoration: BoxDecoration(
-                            gradient: _isAnalyzing
+                            gradient: _isMonitorBusy
                                 ? null
                                 : const LinearGradient(
                                     colors: [kGreen1, kBgMid]),
-                            color: _isAnalyzing
+                            color: _isMonitorBusy
                                 ? Colors.white.withOpacity(.08)
                                 : null,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: const Color(0x66FFFFFF)),
                           ),
-                          child: Text(
-                              _isAnalyzing ? 'Dang xu ly' : 'Phan tich AI',
+                          child: Text(_monitorButtonText,
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
@@ -1611,7 +1832,9 @@ class _CameraPageState extends State<CameraPage> {
                         ),
                       ),
                     ),
-                    if (_aiSummary != null || _aiError != null)
+                    if (_aiSummary != null ||
+                        _aiError != null ||
+                        _monitorStatus != null)
                       Positioned(
                         left: 10,
                         right: 10,
@@ -1624,23 +1847,18 @@ class _CameraPageState extends State<CameraPage> {
                             border: Border.all(color: const Color(0x38FFFFFF)),
                           ),
                           child: Text(
-                            _aiError ??
-                                '${_aiSummary?['disease_name_vi'] ?? _aiSummary?['message'] ?? 'Chua co ket qua'}',
+                            _cameraOverlayText,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: _aiError != null
-                                  ? const Color(0xFFFCA5A5)
-                                  : (_aiSummary?['has_disease'] == true
-                                      ? Colors.orangeAccent
-                                      : kGreen2),
+                              color: _cameraOverlayColor,
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                       ),
-                    if (_isAnalyzing)
+                    if (_monitorAnalyzing)
                       Container(
                         color: Colors.black45,
                         child: const Center(
@@ -1804,7 +2022,7 @@ class _NoCamera extends StatelessWidget {
             style: TextStyle(
                 color: kTextSec, fontSize: 14, fontWeight: FontWeight.w600)),
         SizedBox(height: 4),
-        Text('Nhập địa chỉ MJPEG phía dưới',
+        Text('Bat quet tu dong de backend giu webcam',
             style: TextStyle(color: kTextSec, fontSize: 12)),
       ]),
     );

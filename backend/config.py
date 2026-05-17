@@ -25,4 +25,4 @@ DISEASE_SOLUTIONS_PATH = Path(
 )
 
 YOLO_CONFIDENCE = float(os.getenv("YOLO_CONFIDENCE", "0.25"))
-
+MIN_LEAF_AREA_RATIO = float(os.getenv("MIN_LEAF_AREA_RATIO", "0.08"))

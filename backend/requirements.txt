@@ -1,6 +1,7 @@
 fastapi==0.128.0
 numpy
 pillow
+opencv-python
 python-multipart
 torch
 torchvision

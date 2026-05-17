@@ -28,14 +28,20 @@ class PredictionService:
         detector: LeafDetector,
         classifier: DiseaseClassifier,
         solutions: Mapping[str, Mapping[str, str]],
+        min_leaf_area_ratio: float = 0.08,
     ) -> None:
         self._detector = detector
         self._classifier = classifier
         self._solutions = solutions
+        self._min_leaf_area_ratio = min_leaf_area_ratio
 
     def predict(self, image: Image.Image) -> dict[str, Any]:
         rgb_image = image.convert("RGB")
-        detections = self._detector.detect(rgb_image)
+        detections = self._filter_detections(
+            self._detector.detect(rgb_image),
+            rgb_image.width,
+            rgb_image.height,
+        )
 
         if not detections:
             return {
@@ -51,21 +57,21 @@ class PredictionService:
         prediction_items = [
             self._predict_leaf(rgb_image, detection) for detection in detections
         ]
-        strongest = max(
+        primary = max(
             prediction_items,
-            key=lambda item: float(item.get("disease_confidence", 0.0)),
+            key=lambda item: float(item.get("leaf_area_ratio", 0.0)),
         )
 
         return {
             "image": {"width": rgb_image.width, "height": rgb_image.height},
             "detections": prediction_items,
             "summary": {
-                "has_disease": strongest.get("status") != "healthy",
+                "has_disease": primary.get("status") != "healthy",
                 "leaf_count": len(prediction_items),
-                "disease": strongest["disease"],
-                "disease_name_vi": strongest["disease_name_vi"],
-                "disease_confidence": strongest["disease_confidence"],
-                "solution": strongest["solution"],
+                "disease": primary["disease"],
+                "disease_name_vi": primary["disease_name_vi"],
+                "disease_confidence": primary["disease_confidence"],
+                "solution": primary["solution"],
             },
         }
 
@@ -78,6 +84,10 @@ class PredictionService:
 
         return {
             "box": [x1, y1, x2, y2],
+            "leaf_area_ratio": round(
+                ((x2 - x1) * (y2 - y1)) / (image.width * image.height),
+                4,
+            ),
             "leaf_confidence": round(float(detection.confidence), 4),
             "disease": class_name,
             "disease_name_vi": solution.get("name_vi", class_name),
@@ -88,6 +98,28 @@ class PredictionService:
                 "Chua co huong xu ly cho lop benh nay.",
             ),
         }
+
+    def _filter_detections(
+        self,
+        detections: list[Detection],
+        width: int,
+        height: int,
+    ) -> list[Detection]:
+        if self._min_leaf_area_ratio <= 0:
+            return detections
+
+        image_area = width * height
+        filtered = [
+            detection
+            for detection in detections
+            if self._box_area_ratio(detection.box, image_area) >= self._min_leaf_area_ratio
+        ]
+        return filtered
+
+    @staticmethod
+    def _box_area_ratio(box: list[int], image_area: int) -> float:
+        x1, y1, x2, y2 = box
+        return max(0, x2 - x1) * max(0, y2 - y1) / image_area
 
     @staticmethod
     def _clamp_box(box: list[int], width: int, height: int) -> list[int]:

@@ -36,4 +36,36 @@ void main() {
       );
     });
   });
+
+  group('resolveAiBackendBaseUrl', () {
+    test('strips the predict path from the default AI URL', () {
+      expect(
+        resolveAiBackendBaseUrl('http://localhost:8000/predict'),
+        'http://localhost:8000',
+      );
+    });
+
+    test('trims the last URL segment for a nonstandard explicit predict URL', () {
+      expect(
+        resolveAiBackendBaseUrl('http://10.0.0.8:9000/api/predict-leaf'),
+        'http://10.0.0.8:9000/api',
+      );
+    });
+  });
+
+  group('isBackendWebcamUnavailableError', () {
+    test('detects backend webcam open failures', () {
+      expect(
+        isBackendWebcamUnavailableError('Khong mo duoc webcam index 0.'),
+        isTrue,
+      );
+    });
+
+    test('ignores unrelated backend errors', () {
+      expect(
+        isBackendWebcamUnavailableError('Khong doc duoc frame tu webcam.'),
+        isFalse,
+      );
+    });
+  });
 }
